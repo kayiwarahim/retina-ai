@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Retina Disease Classifier</title>
+    <style>
+        /* Global Styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Card Container */
+        .container {
+            background: #fff;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            text-align: center;
+            width: 380px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 25px;
+            font-size: 2em;
+        }
+
+        input[type="file"] {
+            margin: 20px 0;
+        }
+
+        button {
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #preview {
+            margin-top: 20px;
+            max-width: 100%;
+            border-radius: 15px;
+            border: 2px solid #ddd;
+            display: none;
+            transition: transform 0.3s ease;
+        }
+
+        #preview:hover {
+            transform: scale(1.05);
+        }
+
+        #prediction {
+            margin-top: 25px;
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #333;
+            padding: 10px;
+            border-radius: 12px;
+        }
+
+        .loading {
+            color: #fff;
+            font-size: 1.2em;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% {opacity: 0.2;}
+            50% {opacity: 1;}
+            100% {opacity: 0.2;}
+        }
+
+        /* Responsive */
+        @media (max-width: 420px) {
+            .container {
+                width: 90%;
+                padding: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Retina Disease Classifier</h1>
+
+        <input type="file" id="fileInput" accept="image/*" />
+        <br>
+        <button id="predictBtn">Predict</button>
+
+        <div>
+            <img id="preview" src="#" alt="Image preview">
+        </div>
+
+        <div id="prediction"></div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+        const predictBtn = document.getElementById('predictBtn');
+        const predictionDiv = document.getElementById('prediction');
+
+        // Show preview of uploaded image
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    predictionDiv.innerText = "";
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Send image to Flask API
+        predictBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Please select an image first!");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Show loading
+            predictionDiv.innerHTML = "<span class='loading'>Predicting...</span>";
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    let color = "#28a745"; // green
+                    if(data.prediction === "Diabetic Retinopathy") color = "#ffc107";
+                    else if(data.prediction === "Glaucoma") color = "#dc3545";
+                    else if(data.prediction === "Cataract") color = "#17a2b8";
+
+                    predictionDiv.innerHTML = `<span style="color:${color}">Prediction: ${data.prediction}</span>`;
+                } else {
+                    predictionDiv.innerHTML = `<span style="color:red">Error: ${data.error}</span>`;
+                }
+            } catch (err) {
+                predictionDiv.innerHTML = "<span style='color:red'>Error connecting to server.</span>";
+                console.error(err);
+            }
+        });
+    </script>
+</body>
+</html>
