@@ -12,6 +12,7 @@ IMG_SIZE = 224
 NUM_CLASSES = 4
 DEVICE = torch.device("cpu")
 
+# Hugging Face URL of the model
 MODEL_URL = "https://huggingface.co/kayiwarahim/eye_disease_model/resolve/main/eye_disease_model.pth"
 
 # =====================================================
@@ -41,12 +42,12 @@ class TinyOcuNet(nn.Module):
 # =====================================================
 # LOAD MODEL DIRECTLY FROM URL (in-memory)
 # =====================================================
-_model = None  # global cache
+_model = None  # global cache to avoid re-downloading
 
 def load_model():
     global _model
     if _model is None:
-        print("Loading model from Hugging Face...")
+        print("🔗 Loading model from Hugging Face...")
         response = requests.get(MODEL_URL)
         if response.status_code != 200:
             raise RuntimeError(f"Failed to fetch model: {response.status_code}")
@@ -56,7 +57,7 @@ def load_model():
         model.to(DEVICE)
         model.eval()
         _model = model
-        print("Model loaded into memory!")
+        print("✅ Model loaded into memory!")
     return _model
 
 # =====================================================
