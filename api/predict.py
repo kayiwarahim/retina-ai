@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torchvision import transforms
 from PIL import Image
-import io, os, requests
+import io, requests
 
 # =====================================================
 # CONFIGURATION
@@ -12,7 +12,6 @@ IMG_SIZE = 224
 NUM_CLASSES = 4
 DEVICE = torch.device("cpu")
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "../eye_disease_model.pth")
 MODEL_URL = "https://huggingface.co/kayiwarahim/eye_disease_model/resolve/main/eye_disease_model.pth"
 
 # =====================================================
@@ -22,17 +21,9 @@ class TinyOcuNet(nn.Module):
     def __init__(self, num_classes):
         super(TinyOcuNet, self).__init__()
         self.features = nn.Sequential(
-            nn.Conv2d(3, 32, 3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-
-            nn.Conv2d(32, 64, 3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-
-            nn.Conv2d(64, 128, 3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2)
+            nn.Conv2d(3, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2, 2),
+            nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2, 2),
+            nn.Conv2d(64, 128, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2, 2)
         )
         self.classifier = nn.Sequential(
             nn.Flatten(),
@@ -48,30 +39,25 @@ class TinyOcuNet(nn.Module):
         return x
 
 # =====================================================
-# DOWNLOAD MODEL IF MISSING
+# LOAD MODEL DIRECTLY FROM URL (in-memory)
 # =====================================================
-def download_model():
-    if not os.path.exists(MODEL_PATH):
-        print("🔽 Downloading model from Hugging Face...")
-        response = requests.get(MODEL_URL, stream=True)
-        if response.status_code == 200:
-            with open(MODEL_PATH, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            print("✅ Model downloaded successfully!")
-        else:
-            raise Exception(f"❌ Failed to download model: {response.status_code}")
+_model = None  # global cache
 
-# =====================================================
-# LOAD MODEL FUNCTION
-# =====================================================
 def load_model():
-    download_model()
-    model = TinyOcuNet(NUM_CLASSES)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
-    model.to(DEVICE)
-    model.eval()
-    return model
+    global _model
+    if _model is None:
+        print("🔗 Loading model from Hugging Face...")
+        response = requests.get(MODEL_URL)
+        if response.status_code != 200:
+            raise RuntimeError(f"Failed to fetch model: {response.status_code}")
+        buffer = io.BytesIO(response.content)
+        model = TinyOcuNet(NUM_CLASSES)
+        model.load_state_dict(torch.load(buffer, map_location=DEVICE))
+        model.to(DEVICE)
+        model.eval()
+        _model = model
+        print("✅ Model loaded into memory!")
+    return _model
 
 # =====================================================
 # IMAGE TRANSFORM
@@ -91,14 +77,14 @@ class_names = ["Normal", "Diabetic Retinopathy", "Glaucoma", "Cataract"]
 # =====================================================
 # PREDICTION FUNCTION
 # =====================================================
-def predict_image(image_bytes, model):
+def predict_image(image_bytes):
+    model = load_model()
     try:
         image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     except Exception:
         return {'error': 'Invalid image file'}
 
     img_tensor = transform(image).unsqueeze(0).to(DEVICE)
-
     with torch.no_grad():
         outputs = model(img_tensor)
         _, predicted = torch.max(outputs, 1)
