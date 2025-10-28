@@ -46,7 +46,7 @@ _model = None  # global cache
 def load_model():
     global _model
     if _model is None:
-        print("🔗 Loading model from Hugging Face...")
+        print("Loading model from Hugging Face...")
         response = requests.get(MODEL_URL)
         if response.status_code != 200:
             raise RuntimeError(f"Failed to fetch model: {response.status_code}")
@@ -56,7 +56,7 @@ def load_model():
         model.to(DEVICE)
         model.eval()
         _model = model
-        print("✅ Model loaded into memory!")
+        print("Model loaded into memory!")
     return _model
 
 # =====================================================
